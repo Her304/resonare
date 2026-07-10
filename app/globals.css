@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background: #082F2F;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9a948e;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(1) opacity(0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* smooth scroll inside the phone */
+.phone-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.phone-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* subtle noise overlay to break up flat color fields */
+.r-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 160px 160px;
+}
+
+/* physical press feedback for tappable elements */
+.r-pressable {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.r-pressable:active {
+  transform: scale(0.96);
+  opacity: 0.92;
+}
+
+/* visible keyboard focus ring, hidden for mouse/touch */
+.r-input:focus {
+  outline: none;
+}
+.r-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.45);
+  border-radius: 4px;
+}
