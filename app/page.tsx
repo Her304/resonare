@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 const serif = "var(--font-noto-serif-jp), serif";
 const sans = "var(--font-inter), sans-serif";
+const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 const PAGE_BG =
   "radial-gradient(120% 70% at 50% 0%, #0F5E5E 0%, #082F2F 48%, #061f1f 100%)";
@@ -50,6 +54,81 @@ function Icon({ name, size = 22 }: { name: string; size?: number }) {
   );
 }
 
+/* Fires once when the element scrolls into view — drives scroll reveals and count-ups. */
+function useInView<T extends HTMLElement>(threshold = 0.25) {
+  const ref = useRef<T>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setInView(true);
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { threshold }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [threshold]);
+  return { ref, inView };
+}
+
+/* Scroll-reveal wrapper. `className` picks the motion (reveal | magic-card). */
+function Reveal({
+  children,
+  className = "reveal",
+  delay = 0,
+  style,
+  id,
+}: {
+  children?: React.ReactNode;
+  className?: string;
+  delay?: number;
+  style?: React.CSSProperties;
+  id?: string;
+}) {
+  const { ref, inView } = useInView<HTMLDivElement>();
+  return (
+    <div
+      id={id}
+      ref={ref}
+      className={`${className}${inView ? " in" : ""}`}
+      style={{ transitionDelay: `${delay}ms`, ...style }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* motion-graphics "stat" count-up — eases 0 → target once `run` is true. */
+function useCountUp(target: number, run: boolean, duration = 1200) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!run) return;
+    let raf = 0;
+    let startTs = 0;
+    const tick = (ts: number) => {
+      if (!startTs) startTs = ts;
+      const t = Math.min(1, (ts - startTs) / duration);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setVal(Math.round(target * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, run, duration]);
+  return val;
+}
+
 export default function LandingPage() {
   return (
     <main
@@ -67,6 +146,7 @@ export default function LandingPage() {
       <div style={{ position: "relative", zIndex: 2, maxWidth: 1120, margin: "0 auto", padding: "0 24px" }}>
         {/* Top bar */}
         <header
+          className="kin"
           style={{
             display: "flex",
             alignItems: "center",
@@ -106,7 +186,9 @@ export default function LandingPage() {
         >
           <div style={{ flex: "1 1 0", minWidth: 0 }}>
             <div
+              className="kin"
               style={{
+                animationDelay: "60ms",
                 fontSize: 12,
                 letterSpacing: "0.16em",
                 textTransform: "uppercase",
@@ -125,14 +207,20 @@ export default function LandingPage() {
                 margin: "18px 0 0",
               }}
             >
-              Every show you&rsquo;ve
-              <br />
-              ever felt, kept
-              <br />
-              in <span style={{ color: "#FF6B35" }}>one place.</span>
+              <span className="kin" style={{ display: "block", animationDelay: "150ms" }}>
+                Every show you&rsquo;ve
+              </span>
+              <span className="kin" style={{ display: "block", animationDelay: "250ms" }}>
+                ever felt, kept
+              </span>
+              <span className="kin" style={{ display: "block", animationDelay: "350ms" }}>
+                in <span style={{ color: "#FF6B35" }}>one place.</span>
+              </span>
             </h1>
             <p
+              className="kin"
               style={{
+                animationDelay: "500ms",
                 fontSize: 17,
                 lineHeight: 1.6,
                 color: "rgba(242,236,224,0.72)",
@@ -144,7 +232,17 @@ export default function LandingPage() {
               Resonare turns each concert into a page you&rsquo;ll actually revisit.
             </p>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 32, alignItems: "center" }}>
+            <div
+              className="kin hero-cta"
+              style={{
+                animationDelay: "640ms",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 14,
+                marginTop: 32,
+                alignItems: "center",
+              }}
+            >
               <Link
                 href="/login"
                 className="r-pressable"
@@ -177,12 +275,15 @@ export default function LandingPage() {
                 See what&rsquo;s inside
               </a>
             </div>
-            <div style={{ marginTop: 18, fontSize: 12.5, color: "rgba(242,236,224,0.45)" }}>
+            <div
+              className="kin"
+              style={{ animationDelay: "760ms", marginTop: 18, fontSize: 12.5, color: "rgba(242,236,224,0.45)" }}
+            >
               No password — just a magic link to your inbox.
             </div>
           </div>
 
-          {/* Phone mockup */}
+          {/* Phone mockup — reveals + count-ups when it enters view */}
           <div style={{ flex: "0 0 auto", display: "flex", justifyContent: "center" }}>
             <PhoneMockup />
           </div>
@@ -190,29 +291,56 @@ export default function LandingPage() {
 
         {/* Features */}
         <section id="features" style={{ paddingBottom: 40, scrollMarginTop: 24 }}>
-          <div
-            style={{
-              fontSize: 12,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
-              color: "rgba(242,236,224,0.5)",
-              textAlign: "center",
-            }}
-          >
-            one entry per night
+          <Reveal>
+            <div
+              style={{
+                fontSize: 12,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: "rgba(242,236,224,0.5)",
+                textAlign: "center",
+              }}
+            >
+              one entry per night
+            </div>
+          </Reveal>
+          <Reveal delay={80}>
+            <h2
+              style={{
+                fontFamily: serif,
+                fontWeight: 700,
+                fontSize: "clamp(28px, 4vw, 38px)",
+                letterSpacing: "-0.5px",
+                textAlign: "center",
+                margin: "12px 0 0",
+              }}
+            >
+              Everything from that show, together
+            </h2>
+          </Reveal>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <Reveal
+              className="accent-wipe"
+              delay={140}
+              style={{ width: 64, height: 3, borderRadius: 2, background: "#FF6B35", marginTop: 16 }}
+            />
           </div>
-          <h2
-            style={{
-              fontFamily: serif,
-              fontWeight: 700,
-              fontSize: "clamp(28px, 4vw, 38px)",
-              letterSpacing: "-0.5px",
-              textAlign: "center",
-              margin: "12px 0 0",
-            }}
-          >
-            Everything from that show, together
-          </h2>
+
+          {/* Magic Move handoff: the same concert card from the phone relays down here */}
+          <Reveal className="magic-card" style={{ maxWidth: 400, margin: "34px auto 0" }}>
+            <div
+              style={{
+                fontSize: 12,
+                letterSpacing: "0.06em",
+                color: "rgba(242,236,224,0.5)",
+                textAlign: "center",
+                marginBottom: 12,
+              }}
+            >
+              one card holds the whole night
+            </div>
+            <ConcertCard height={158} radius={20} titleSize={21} />
+          </Reveal>
 
           <div
             className="landing-features"
@@ -223,94 +351,98 @@ export default function LandingPage() {
               marginTop: 44,
             }}
           >
-            {FEATURES.map((f) => (
-              <div
-                key={f.title}
-                style={{
-                  background: "rgba(242,236,224,0.04)",
-                  border: "1px solid rgba(242,236,224,0.1)",
-                  borderRadius: 20,
-                  padding: "26px 24px",
-                }}
-              >
+            {FEATURES.map((f, i) => (
+              <Reveal key={f.title} delay={i * 70} style={{ height: "100%" }}>
                 <div
                   style={{
-                    width: 46,
-                    height: 46,
-                    borderRadius: 13,
-                    background: "rgba(255,107,53,0.14)",
-                    color: "#FF6B35",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    height: "100%",
+                    background: "rgba(242,236,224,0.04)",
+                    border: "1px solid rgba(242,236,224,0.1)",
+                    borderRadius: 20,
+                    padding: "26px 24px",
                   }}
                 >
-                  <Icon name={f.icon} size={24} />
+                  <div
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: 13,
+                      background: "rgba(255,107,53,0.14)",
+                      color: "#FF6B35",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon name={f.icon} size={24} />
+                  </div>
+                  <div style={{ fontFamily: serif, fontWeight: 600, fontSize: 19, marginTop: 18 }}>
+                    {f.title}
+                  </div>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, color: "rgba(242,236,224,0.65)", margin: "8px 0 0" }}>
+                    {f.body}
+                  </p>
                 </div>
-                <div style={{ fontFamily: serif, fontWeight: 600, fontSize: 19, marginTop: 18 }}>
-                  {f.title}
-                </div>
-                <p style={{ fontSize: 14, lineHeight: 1.6, color: "rgba(242,236,224,0.65)", margin: "8px 0 0" }}>
-                  {f.body}
-                </p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </section>
 
         {/* Closing CTA */}
         <section style={{ padding: "64px 0 80px" }}>
-          <div
-            style={{
-              background: "linear-gradient(135deg, rgba(15,94,94,0.55), rgba(8,47,47,0.55))",
-              border: "1px solid rgba(242,236,224,0.12)",
-              borderRadius: 28,
-              padding: "clamp(32px, 5vw, 56px)",
-              textAlign: "center",
-            }}
-          >
-            <h2
+          <Reveal>
+            <div
               style={{
-                fontFamily: serif,
-                fontWeight: 700,
-                fontSize: "clamp(26px, 4vw, 36px)",
-                letterSpacing: "-0.5px",
-                margin: 0,
+                background: "linear-gradient(135deg, rgba(15,94,94,0.55), rgba(8,47,47,0.55))",
+                border: "1px solid rgba(242,236,224,0.12)",
+                borderRadius: 28,
+                padding: "clamp(32px, 5vw, 56px)",
+                textAlign: "center",
               }}
             >
-              Your next show deserves a page.
-            </h2>
-            <p
-              style={{
-                fontSize: 16,
-                lineHeight: 1.6,
-                color: "rgba(242,236,224,0.7)",
-                margin: "14px auto 0",
-                maxWidth: 440,
-              }}
-            >
-              Start with the last ticket in your pocket. It takes about a minute to log a night you&rsquo;ll
-              keep forever.
-            </p>
-            <Link
-              href="/login"
-              className="r-pressable"
-              style={{
-                display: "inline-block",
-                marginTop: 28,
-                background: "#FF6B35",
-                color: "#F2ECE0",
-                fontSize: 15,
-                fontWeight: 600,
-                textDecoration: "none",
-                padding: "15px 30px",
-                borderRadius: 999,
-                boxShadow: "0 16px 34px -14px rgba(255,107,53,0.7)",
-              }}
-            >
-              Start your diary
-            </Link>
-          </div>
+              <h2
+                style={{
+                  fontFamily: serif,
+                  fontWeight: 700,
+                  fontSize: "clamp(26px, 4vw, 36px)",
+                  letterSpacing: "-0.5px",
+                  margin: 0,
+                }}
+              >
+                Your next show deserves a page.
+              </h2>
+              <p
+                style={{
+                  fontSize: 16,
+                  lineHeight: 1.6,
+                  color: "rgba(242,236,224,0.7)",
+                  margin: "14px auto 0",
+                  maxWidth: 440,
+                }}
+              >
+                Start with the last ticket in your pocket. It takes about a minute to log a night you&rsquo;ll
+                keep forever.
+              </p>
+              <Link
+                href="/login"
+                className="r-pressable"
+                style={{
+                  display: "inline-block",
+                  marginTop: 28,
+                  background: "#FF6B35",
+                  color: "#F2ECE0",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  padding: "15px 30px",
+                  borderRadius: 999,
+                  boxShadow: "0 16px 34px -14px rgba(255,107,53,0.7)",
+                }}
+              >
+                Start your diary
+              </Link>
+            </div>
+          </Reveal>
         </section>
 
         {/* Footer */}
@@ -338,10 +470,54 @@ export default function LandingPage() {
   );
 }
 
-/* A static, on-brand echo of the app's phone frame for the hero. */
-function PhoneMockup() {
+/* The shared "Magic Move" element — the same concert card appears in the phone
+   hero and, relayed, in the features section. */
+function ConcertCard({ height, radius, titleSize }: { height: number; radius: number; titleSize: number }) {
   return (
     <div
+      style={{
+        height,
+        borderRadius: radius,
+        position: "relative",
+        overflow: "hidden",
+        background: "linear-gradient(135deg, #0F5E5E, #082F2F)",
+        border: "1px solid rgba(242,236,224,0.12)",
+      }}
+    >
+      <div style={{ position: "absolute", top: 12, right: 12, color: "#FF6B35" }}>
+        <Icon name="star" size={20} />
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0) 70%)",
+        }}
+      />
+      <div style={{ position: "absolute", left: 14, right: 14, bottom: 12 }}>
+        <div style={{ fontFamily: serif, fontWeight: 700, fontSize: titleSize, color: "#fff" }}>
+          The Eras Tour
+        </div>
+        <div style={{ fontFamily: serif, fontSize: 11.5, color: "rgba(255,255,255,0.9)", marginTop: 1 }}>
+          Taylor Swift
+        </div>
+        <div style={{ fontSize: 11, color: "#fff", marginTop: 3 }}>Toronto · Nov 21, 2024</div>
+      </div>
+    </div>
+  );
+}
+
+/* A static, on-brand echo of the app's phone frame for the hero. */
+function PhoneMockup() {
+  const { ref, inView } = useInView<HTMLDivElement>(0.3);
+  const shows = useCountUp(12, inView);
+  const cities = useCountUp(6, inView, 1000);
+  const photos = useCountUp(48, inView, 1400);
+
+  return (
+    <div
+      ref={ref}
+      className={`reveal${inView ? " in" : ""}`}
       style={{
         width: 300,
         borderRadius: 40,
@@ -372,26 +548,25 @@ function PhoneMockup() {
           boxShadow: "0 18px 36px -22px rgba(2,16,16,0.7)",
         }}
       >
-        <Ring value={12} />
+        <Ring value={shows} inView={inView} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: serif, fontWeight: 700, fontSize: 15, color: "#1a1816" }}>
-            12 of 15 shows logged
+            {shows} of 15 shows logged
           </div>
-          <div style={{ fontSize: 11.5, color: "#8f8a85", marginTop: 3 }}>9 artists · 6 cities explored</div>
+          <div style={{ fontSize: 11.5, color: "#8f8a85", marginTop: 3 }}>
+            9 artists · {cities} cities explored
+          </div>
         </div>
       </div>
 
       {/* mini stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 12 }}>
         {[
-          ["shows", "12"],
-          ["cities", "6"],
-          ["photos", "48"],
+          ["shows", shows],
+          ["cities", cities],
+          ["photos", photos],
         ].map(([label, value]) => (
-          <div
-            key={label}
-            style={{ background: "#F2ECE0", borderRadius: 12, padding: "10px 10px 12px" }}
-          >
+          <div key={label as string} style={{ background: "#F2ECE0", borderRadius: 12, padding: "10px 10px 12px" }}>
             <div style={{ fontSize: 8.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8f8a85" }}>
               {label}
             </div>
@@ -402,43 +577,15 @@ function PhoneMockup() {
         ))}
       </div>
 
-      {/* concert card */}
-      <div
-        style={{
-          marginTop: 12,
-          height: 132,
-          borderRadius: 18,
-          position: "relative",
-          overflow: "hidden",
-          background: "linear-gradient(135deg, #0F5E5E, #082F2F)",
-          border: "1px solid rgba(242,236,224,0.12)",
-        }}
-      >
-        <div style={{ position: "absolute", top: 12, right: 12, color: "#FF6B35" }}>
-          <Icon name="star" size={20} />
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0) 70%)",
-          }}
-        />
-        <div style={{ position: "absolute", left: 14, right: 14, bottom: 12 }}>
-          <div style={{ fontFamily: serif, fontWeight: 700, fontSize: 17, color: "#fff" }}>
-            The Eras Tour
-          </div>
-          <div style={{ fontFamily: serif, fontSize: 11.5, color: "rgba(255,255,255,0.9)", marginTop: 1 }}>
-            Taylor Swift
-          </div>
-          <div style={{ fontSize: 11, color: "#fff", marginTop: 3 }}>Toronto · Nov 21, 2024</div>
-        </div>
+      {/* concert card (shared Magic Move element) */}
+      <div style={{ marginTop: 12 }}>
+        <ConcertCard height={132} radius={18} titleSize={17} />
       </div>
     </div>
   );
 }
 
-function Ring({ value }: { value: number }) {
+function Ring({ value, inView }: { value: number; inView: boolean }) {
   const r = 22;
   const c = 2 * Math.PI * r;
   const pct = 0.8;
@@ -455,7 +602,8 @@ function Ring({ value }: { value: number }) {
           strokeWidth="5"
           strokeLinecap="round"
           strokeDasharray={c}
-          strokeDashoffset={c * (1 - pct)}
+          strokeDashoffset={inView ? c * (1 - pct) : c}
+          style={{ transition: `stroke-dashoffset 1.2s ${EASE}` }}
         />
       </svg>
       <div
