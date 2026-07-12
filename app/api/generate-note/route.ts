@@ -64,7 +64,7 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-5.6-terra",
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },

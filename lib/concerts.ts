@@ -19,6 +19,7 @@ export interface Photo {
 export interface Concert {
   id: string;
   artist: string;
+  showName: string; // tour / event name, distinct from the artist
   venue: string;
   date: string;
   comment: string;
@@ -31,6 +32,7 @@ export interface Concert {
 
 export interface ConcertDraft {
   artist: string;
+  showName: string;
   venue: string;
   date: string;
   comment: string;
@@ -87,6 +89,7 @@ interface SpotifyRow {
 interface ConcertRow {
   id: string;
   artist_name: string;
+  show_name: string | null;
   venue: string;
   concert_date: string | null;
   ticket_url: string | null;
@@ -103,7 +106,7 @@ export async function loadConcerts(): Promise<Concert[]> {
   const { data, error } = await supabase
     .from("concerts")
     .select(
-      "id, artist_name, venue, concert_date, ticket_url, ticket_caption, notes, favorite, created_at, " +
+      "id, artist_name, show_name, venue, concert_date, ticket_url, ticket_caption, notes, favorite, created_at, " +
         "concert_photos(photo_url, order_index, caption), " +
         "concert_spotify(spotify_type, spotify_id, name, artist, cover_url, external_url)"
     )
@@ -143,6 +146,7 @@ export async function loadConcerts(): Promise<Concert[]> {
       return {
         id: row.id,
         artist: row.artist_name,
+        showName: row.show_name ?? "",
         venue: row.venue,
         date: row.concert_date ?? "",
         comment: row.notes,
@@ -173,6 +177,7 @@ export async function createConcert(draft: ConcertDraft): Promise<void> {
     .insert({
       user_id: userId,
       artist_name: draft.artist.trim() || "untitled show",
+      show_name: draft.showName.trim(),
       venue: draft.venue.trim(),
       concert_date: draft.date || null,
       notes: draft.comment.trim(),
@@ -261,6 +266,7 @@ export async function signOut(): Promise<void> {
 export interface UserProfile {
   email: string;
   name: string;
+  goal: number | null; // personal target number of shows; null = use auto goal
 }
 
 export async function loadUserProfile(): Promise<UserProfile> {
@@ -268,12 +274,22 @@ export async function loadUserProfile(): Promise<UserProfile> {
   const { data } = await supabase.auth.getUser();
   const user = data.user;
   const name = (user?.user_metadata?.display_name as string | undefined) ?? "";
-  return { email: user?.email ?? "", name };
+  const goalRaw = user?.user_metadata?.shows_goal;
+  const goal = typeof goalRaw === "number" && goalRaw > 0 ? Math.floor(goalRaw) : null;
+  return { email: user?.email ?? "", name, goal };
 }
 
 export async function setDisplayName(name: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.auth.updateUser({ data: { display_name: name.trim() } });
+  if (error) throw error;
+}
+
+// Personal shows goal, stored in auth metadata. Pass null to clear it (revert to auto).
+export async function setShowsGoal(goal: number | null): Promise<void> {
+  const supabase = createClient();
+  const value = goal && goal > 0 ? Math.floor(goal) : null;
+  const { error } = await supabase.auth.updateUser({ data: { shows_goal: value } });
   if (error) throw error;
 }
 

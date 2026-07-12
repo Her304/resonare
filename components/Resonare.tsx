@@ -1,24 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import {
-  type SpotifyItem,
-  type Concert,
-  type UserProfile,
-  type Photo,
-  loadConcerts,
-  createConcert,
-  setFavorite,
-  deleteAllConcerts,
-  importConcertsMeta,
-  searchSpotify,
-  parseSpotifyLink,
-  lookupSpotify,
-  generateNote,
-  signOut,
-  loadUserProfile,
-  setDisplayName,
-} from "@/lib/concerts";
+import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
+import { type SpotifyItem, type Concert, type UserProfile } from "@/lib/concerts";
+
+// Leaflet touches `window`, so the map is client-only (no SSR).
+const ConcertMap = dynamic(() => import("./ConcertMap"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height: 260, borderRadius: 18, background: "rgba(242,236,224,0.06)" }} />
+  ),
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,17 +26,16 @@ function prettyDate(iso: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-type Screen = "home" | "log" | "detail" | "profile";
-
 const STEP_TITLES = ["the show", "the memories", "the soundtrack", "the feeling"];
 
-interface DraftPhoto {
+export interface DraftPhoto {
   dataUrl: string;
   caption: string;
 }
 
-interface Draft {
+export interface Draft {
   artist: string;
+  showName: string;
   venue: string;
   date: string;
   spotify: SpotifyItem | null;
@@ -264,7 +255,7 @@ function FilePicker({
 }
 
 // Full-screen image viewer with an optional editable caption.
-function Lightbox({
+export function Lightbox({
   url,
   caption,
   editable,
@@ -293,7 +284,7 @@ function Lightbox({
   }
 
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 60, background: "rgba(4,16,16,0.94)", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(4,16,16,0.94)", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px" }}>
         {editable && onRemove ? (
           <div
@@ -451,9 +442,13 @@ function StatRing({ value, max, size = 64, strokeWidth = 6 }: { value: number; m
   );
 }
 
-function MiniStat({ label, value, sub, progress }: { label: string; value: string | number; sub?: string; progress?: number }) {
+function MiniStat({ label, value, sub, progress, onClick }: { label: string; value: string | number; sub?: string; progress?: number; onClick?: () => void }) {
   return (
-    <div style={{ flex: 1, background: "#F2ECE0", border: "1px solid rgba(15,94,94,0.16)", borderRadius: 16, padding: "12px 14px", minWidth: 0 }}>
+    <div
+      onClick={onClick}
+      className={onClick ? "r-pressable" : undefined}
+      style={{ flex: 1, background: "#F2ECE0", border: "1px solid rgba(15,94,94,0.16)", borderRadius: 16, padding: "12px 14px", minWidth: 0, cursor: onClick ? "pointer" : "default" }}
+    >
       <div style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8f8a85", fontFamily: "var(--font-inter), sans-serif", marginBottom: 4 }}>
         {label}
       </div>
@@ -472,7 +467,7 @@ function MiniStat({ label, value, sub, progress }: { label: string; value: strin
   );
 }
 
-function BottomNav({
+export function BottomNav({
   active,
   onNavigate,
   onAdd,
@@ -575,7 +570,7 @@ function BottomNav({
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
 
-function HomeScreen({
+export function HomeScreen({
   concerts,
   onOpenConcert,
   onToggleFavorite,
@@ -611,9 +606,10 @@ function HomeScreen({
 
   return (
     <div style={{ minHeight: "100%" }}>
+      <br />
       {/* Header */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "26px 22px 18px" }}>
-        <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 700, fontSize: 26, letterSpacing: "-0.4px", color: "#F2ECE0" }}>
+        <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 700, fontSize: 36, letterSpacing: "-0.4px", color: "#F2ECE0" }}>
           resonare
         </div>
         <div style={{ fontSize: 10.5, letterSpacing: "0.1em", color: "rgba(242,236,224,0.55)", textTransform: "uppercase", fontFamily: "var(--font-inter), sans-serif" }}>
@@ -778,7 +774,7 @@ function HomeScreen({
                 style={{
                   position: "absolute",
                   inset: 0,
-                  background: "linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.4) 34%, rgba(0,0,0,0) 68%)",
+                  background: "linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 68%)",
                 }}
               />
 
@@ -786,10 +782,15 @@ function HomeScreen({
                 <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 700, fontSize: 19, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}>
-                      {c.artist}
+                      {c.showName || c.artist}
                     </div>
+                    {c.showName && (
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.92)", fontFamily: "var(--font-noto-serif-jp), serif", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}>
+                        {c.artist}
+                      </div>
+                    )}
                     {meta && (
-                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "var(--font-inter), sans-serif", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,1)", fontFamily: "var(--font-inter), sans-serif", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {meta}
                       </div>
                     )}
@@ -837,7 +838,7 @@ function HomeScreen({
 
 // ─── Log Screen ───────────────────────────────────────────────────────────────
 
-function LogScreen({
+export function LogScreen({
   draft,
   step,
   spotifyQuery,
@@ -890,6 +891,76 @@ function LogScreen({
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
 
+  // Venue typeahead: debounced Nominatim search that suggests "place, city"
+  // completions as the user types (e.g. "waterloo" → "Waterloo, Ontario").
+  const [venueSuggestions, setVenueSuggestions] = useState<{ value: string; sub: string }[]>([]);
+  const [venueOpen, setVenueOpen] = useState(false);
+  const [venueLoading, setVenueLoading] = useState(false);
+  const venuePickedRef = useRef(false);
+
+  useEffect(() => {
+    // Skip the fetch that the effect would otherwise fire right after a pick
+    // (selecting a suggestion writes back into draft.venue).
+    if (venuePickedRef.current) {
+      venuePickedRef.current = false;
+      return;
+    }
+    if (!venueOpen) return;
+    const q = draft.venue.trim();
+    if (q.length < 2) {
+      setVenueSuggestions([]);
+      setVenueLoading(false);
+      return;
+    }
+    setVenueLoading(true);
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&q=${encodeURIComponent(q)}`,
+          { headers: { Accept: "application/json" }, signal: controller.signal }
+        );
+        if (!res.ok) throw new Error("nominatim");
+        const data = (await res.json()) as {
+          name?: string;
+          display_name: string;
+          address?: Record<string, string>;
+        }[];
+        const seen = new Set<string>();
+        const suggestions: { value: string; sub: string }[] = [];
+        for (const item of data) {
+          const a = item.address ?? {};
+          const settlement =
+            a.city || a.town || a.village || a.hamlet || a.municipality || a.suburb || a.county || "";
+          const region = a.state || a.province || a.region || "";
+          const country = a.country || "";
+          const name = item.name || item.display_name.split(",")[0].trim();
+          // "venue, city" — keep the trailing segment a real place so the
+          // profile map's cityFromVenue() can still geocode it.
+          let value: string;
+          if (name && settlement && name !== settlement) {
+            value = `${name}, ${settlement}`;
+          } else {
+            value = [settlement || name, region || country].filter(Boolean).join(", ");
+          }
+          if (!value || seen.has(value.toLowerCase())) continue;
+          seen.add(value.toLowerCase());
+          const sub = [region, country].filter((c) => c && !value.includes(c)).join(", ");
+          suggestions.push({ value, sub });
+        }
+        setVenueSuggestions(suggestions);
+      } catch {
+        /* aborted or network error — leave the last suggestions in place */
+      } finally {
+        setVenueLoading(false);
+      }
+    }, 350);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [draft.venue, venueOpen]);
+
   async function runGenerate() {
     setGenerating(true);
     setGenError(null);
@@ -906,7 +977,7 @@ function LogScreen({
   return (
     <div style={{ minHeight: "100%" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "22px 16px 4px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "22px 16px 4px" }}>
         <div
           onClick={onBack}
           className="r-pressable"
@@ -924,32 +995,30 @@ function LogScreen({
         >
           <IconChevronLeft size={20} />
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 26,
-                height: 26,
-                borderRadius: 7,
-                background: "rgba(255,107,53,0.18)",
-                color: "#FF6B35",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <MaterialIcon name={stepIconName} size={16} fill={1} />
-            </div>
-            <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 600, fontSize: 18, color: "#F2ECE0" }}>
-              {STEP_TITLES[step - 1]}
-            </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            style={{
+              width: 46,
+              height: 46,
+              borderRadius: 7,
+              background: "rgba(255,107,53,0)",
+              color: "#FF6B35",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <MaterialIcon name={stepIconName} size={30} fill={1} />
           </div>
-          <div style={{ display: "flex", gap: 5, marginTop: 10 }}>
-            {stepDots.map((d, i) => (
-              <div key={i} style={{ height: 3, flex: 1, borderRadius: 2, background: d.color, transition: "background .25s ease" }} />
-            ))}
+          <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 700, fontSize: 24, color: "#F2ECE0" }}>
+            {STEP_TITLES[step - 1]}
           </div>
+        </div>
+        <div style={{ display: "flex", gap: 5 }}>
+          {stepDots.map((d, i) => (
+            <div key={i} style={{ height: 3, flex: 1, borderRadius: 2, background: d.color, transition: "background .25s ease" }} />
+          ))}
         </div>
       </div>
 
@@ -981,9 +1050,9 @@ function LogScreen({
             />
             <input
               type="text"
-              value={draft.venue}
-              onChange={(e) => onDraftChange({ venue: e.target.value })}
-              placeholder="venue, city"
+              value={draft.showName}
+              onChange={(e) => onDraftChange({ showName: e.target.value })}
+              placeholder="tour / event name (optional)"
               className="r-input"
               style={{
                 background: "transparent",
@@ -998,6 +1067,83 @@ function LogScreen({
                 fontFamily: "var(--font-inter), sans-serif",
               }}
             />
+            <div style={{ position: "relative", marginBottom: 18 }}>
+              <input
+                type="text"
+                value={draft.venue}
+                onChange={(e) => onDraftChange({ venue: e.target.value })}
+                onFocus={() => setVenueOpen(true)}
+                onBlur={() => setTimeout(() => setVenueOpen(false), 150)}
+                placeholder="venue, city"
+                autoComplete="off"
+                className="r-input"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: "1px solid rgba(242,236,224,0.22)",
+                  color: "#F2ECE0",
+                  fontSize: 15,
+                  padding: "10px 2px",
+                  width: "100%",
+                  outline: "none",
+                  fontFamily: "var(--font-inter), sans-serif",
+                }}
+              />
+              {venueOpen && draft.venue.trim().length >= 2 && (venueLoading || venueSuggestions.length > 0) && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    marginTop: 4,
+                    zIndex: 5,
+                    background: "#F2ECE0",
+                    border: "1px solid rgba(15,94,94,0.2)",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    boxShadow: "0 10px 28px rgba(0,0,0,0.35)",
+                  }}
+                >
+                  {venueLoading && venueSuggestions.length === 0 && (
+                    <div style={{ fontSize: 12.5, color: "#8f8a85", fontFamily: "var(--font-inter), sans-serif", padding: "10px 12px" }}>
+                      searching…
+                    </div>
+                  )}
+                  {venueSuggestions.map((s, i) => (
+                    <div
+                      key={s.value}
+                      // onMouseDown fires before the input's onBlur, so the pick registers.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        venuePickedRef.current = true;
+                        onDraftChange({ venue: s.value });
+                        setVenueOpen(false);
+                        setVenueSuggestions([]);
+                      }}
+                      className="r-pressable"
+                      style={{
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 8,
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        borderTop: i === 0 ? undefined : "1px solid rgba(15,94,94,0.1)",
+                      }}
+                    >
+                      <span style={{ fontSize: 14, color: "#1a1816", fontFamily: "var(--font-inter), sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {s.value}
+                      </span>
+                      {s.sub && (
+                        <span style={{ fontSize: 11.5, color: "#8f8a85", fontFamily: "var(--font-inter), sans-serif", whiteSpace: "nowrap" }}>
+                          {s.sub}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <input
               type="date"
               value={draft.date}
@@ -1380,8 +1526,13 @@ function LogScreen({
               }}
             >
               <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 600, fontSize: 17, color: "#1a1816" }}>
-                {draft.artist.trim() || "untitled show"}
+                {draft.showName.trim() || draft.artist.trim() || "untitled show"}
               </div>
+              {draft.showName.trim() && (
+                <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontSize: 13.5, color: "#0F5E5E", marginTop: -4 }}>
+                  {draft.artist.trim() || "artist tbd"}
+                </div>
+              )}
               <div style={{ fontSize: 12.5, color: "#8f8a85", fontFamily: "var(--font-inter), sans-serif" }}>
                 {(draft.venue.trim() || "venue tbd") + " · " + (draft.date ? prettyDate(draft.date) : "date tbd")}
               </div>
@@ -1441,7 +1592,7 @@ function LogScreen({
 
 // ─── Detail Screen ─────────────────────────────────────────────────────────────
 
-function DetailScreen({
+export function DetailScreen({
   concert,
   onBack,
   onToggleFavorite,
@@ -1519,8 +1670,13 @@ function DetailScreen({
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginTop: 22 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 700, fontSize: 27, color: "#F2ECE0", lineHeight: 1.1 }}>
-              {concert.artist}
+              {concert.showName || concert.artist}
             </div>
+            {concert.showName && (
+              <div style={{ fontSize: 15, color: "rgba(242,236,224,0.82)", marginTop: 6, fontFamily: "var(--font-noto-serif-jp), serif" }}>
+                {concert.artist}
+              </div>
+            )}
             <div style={{ fontSize: 13, color: "rgba(242,236,224,0.6)", marginTop: 6, fontFamily: "var(--font-inter), sans-serif" }}>
               {(concert.venue || "venue tbd") + " · " + prettyDate(concert.date)}
             </div>
@@ -1651,7 +1807,7 @@ function DetailScreen({
 
 // ─── Profile Screen ─────────────────────────────────────────────────────────────
 
-interface ImportMeta {
+export interface ImportMeta {
   artist: string;
   venue: string;
   date: string;
@@ -1659,7 +1815,7 @@ interface ImportMeta {
   favorite: boolean;
 }
 
-function ProfileScreen({
+export function ProfileScreen({
   concerts,
   profile,
   onOpenConcert,
@@ -1667,6 +1823,7 @@ function ProfileScreen({
   onReset,
   onSignOut,
   onRename,
+  onSetGoal,
 }: {
   concerts: Concert[];
   profile: UserProfile;
@@ -1675,11 +1832,18 @@ function ProfileScreen({
   onReset: () => void;
   onSignOut: () => void;
   onRename: (name: string) => void;
+  onSetGoal: (goal: number | null) => void;
 }) {
   const [importError, setImportError] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(profile.name);
+  const [statSheet, setStatSheet] = useState<null | "shows" | "artists" | "cities" | "photos" | "favorites" | "top">(null);
+  const [goalInput, setGoalInput] = useState(profile.goal ? String(profile.goal) : "");
+
+  useEffect(() => {
+    setGoalInput(profile.goal ? String(profile.goal) : "");
+  }, [profile.goal]);
   const resetTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -1708,7 +1872,9 @@ function ProfileScreen({
 
   const uniqueArtists = new Set(concerts.map((c) => c.artist)).size;
   const uniqueCities = new Set(concerts.map((c) => cityFromVenue(c.venue))).size;
-  const showsGoal = Math.max(5, Math.ceil((totalShows + 1) / 5) * 5);
+  const autoGoal = Math.max(5, Math.ceil((totalShows + 1) / 5) * 5);
+  // Personal target if the user set one, otherwise the rolling auto milestone.
+  const showsGoal = profile.goal ?? autoGoal;
 
   function handleExport() {
     const payload = concerts.map((c) => ({
@@ -1786,13 +1952,14 @@ function ProfileScreen({
 
   return (
     <div style={{ minHeight: "100%" }}>
+      <br />
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "26px 22px 18px" }}>
         <div
           style={{
-            width: 52,
-            height: 52,
-            borderRadius: 16,
+            width: 50,
+            height: 50,
+            borderRadius: 15,
             background: "#FF6B35",
             display: "flex",
             alignItems: "center",
@@ -1801,7 +1968,7 @@ function ProfileScreen({
             color: "#F2ECE0",
           }}
         >
-          <MaterialIcon name="account_circle" size={34} />
+          <MaterialIcon name="account_circle" size={39} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           {editingName ? (
@@ -1838,7 +2005,7 @@ function ProfileScreen({
               onClick={() => setEditingName(true)}
               style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
             >
-              <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 700, fontSize: 20, color: "#F2ECE0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 800, fontSize: 25, color: "#F2ECE0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {profile.name || "add your name"}
               </div>
               <span style={{ color: "rgba(242,236,224,0.5)", display: "flex", flexShrink: 0 }}>
@@ -1846,7 +2013,7 @@ function ProfileScreen({
               </span>
             </div>
           )}
-          <div style={{ fontSize: 11.5, color: "rgba(242,236,224,0.6)", fontFamily: "var(--font-inter), sans-serif", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 11.5, color: "rgba(242,236,224,0.6)", fontFamily: "var(--font-inter), sans-serif", marginTop: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {profile.email || "every show, kept somewhere safe"}
           </div>
         </div>
@@ -1896,18 +2063,36 @@ function ProfileScreen({
 
         {/* Milestones */}
         <div style={{ display: "flex", gap: 8 }}>
-          <MiniStat label="shows" value={totalShows} sub={`next goal ${showsGoal}`} progress={showsGoal > 0 ? totalShows / showsGoal : 0} />
-          <MiniStat label="artists" value={uniqueArtists} sub="unique acts" />
-          <MiniStat label="cities" value={uniqueCities} sub="explored" />
+          <MiniStat label="shows" value={totalShows} sub={`${profile.goal ? "goal" : "next goal"} ${showsGoal}`} progress={showsGoal > 0 ? totalShows / showsGoal : 0} onClick={() => setStatSheet("shows")} />
+          <MiniStat label="artists" value={uniqueArtists} sub="unique acts" onClick={() => setStatSheet("artists")} />
+          <MiniStat label="cities" value={uniqueCities} sub="explored" onClick={() => setStatSheet("cities")} />
         </div>
 
         {/* Quick stats */}
         <div style={{ display: "flex", gap: 8 }}>
-          <MiniStat label="photos" value={photoCount} sub="captured" />
-          <MiniStat label="favorites" value={favoriteCount} sub="starred shows" />
-          <MiniStat label="top artist" value={topArtist ? topArtist[0] : "—"} sub={topArtist ? `${topArtist[1]} show${topArtist[1] === 1 ? "" : "s"}` : "log a show"} />
+          <MiniStat label="photos" value={photoCount} sub="captured" onClick={() => setStatSheet("photos")} />
+          <MiniStat label="favorites" value={favoriteCount} sub="starred shows" onClick={() => setStatSheet("favorites")} />
+          <MiniStat label="top artist" value={topArtist ? topArtist[0] : "—"} sub={topArtist ? `${topArtist[1]} show${topArtist[1] === 1 ? "" : "s"}` : "log a show"} onClick={topArtist ? () => setStatSheet("top") : undefined} />
         </div>
       </div>
+
+      {/* Map of cities */}
+      {concerts.length > 0 && (
+        <div style={{ padding: "10px 20px 0" }}>
+          <div style={{ fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(242,236,224,0.55)", fontFamily: "var(--font-inter), sans-serif", marginBottom: 10 }}>
+            your map · {uniqueCities} cit{uniqueCities === 1 ? "y" : "ies"}
+          </div>
+          <ConcertMap
+            concerts={concerts.map((c) => ({
+              id: c.id,
+              artist: c.artist,
+              showName: c.showName,
+              venue: c.venue,
+              date: c.date,
+            }))}
+          />
+        </div>
+      )}
 
       {/* Stamps grid */}
       <div style={{ padding: "10px 20px 0" }}>
@@ -2001,370 +2186,176 @@ function ProfileScreen({
           <div style={{ marginTop: 8, fontSize: 12, color: "#FF6B35", fontFamily: "var(--font-inter), sans-serif" }}>{importError}</div>
         )}
       </div>
+
+      {statSheet &&
+        (() => {
+          const rowStyle: React.CSSProperties = {
+            padding: "11px 4px",
+            borderBottom: "1px solid rgba(242,236,224,0.08)",
+            fontFamily: "var(--font-inter), sans-serif",
+          };
+          const concertRow = (c: Concert) => (
+            <div
+              key={c.id}
+              onClick={() => {
+                setStatSheet(null);
+                onOpenConcert(c.id);
+              }}
+              className="r-pressable"
+              style={{ ...rowStyle, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, color: "#F2ECE0", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {c.artist}
+                  {c.showName ? <span style={{ fontStyle: "italic", color: "rgba(242,236,224,0.6)", fontWeight: 400 }}> · {c.showName}</span> : null}
+                </div>
+                <div style={{ fontSize: 11.5, color: "rgba(242,236,224,0.5)", marginTop: 2 }}>
+                  {[cityFromVenue(c.venue), prettyDate(c.date)].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+              {c.favorite && <Star size={14} filled color="#FF6B35" />}
+              <IconChevronRight size={14} />
+            </div>
+          );
+          const countRow = (label: string, count: number) => (
+            <div key={label} style={{ ...rowStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 14, color: "#F2ECE0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
+              <div style={{ fontSize: 12.5, color: "rgba(242,236,224,0.55)", flexShrink: 0, marginLeft: 10 }}>
+                {count} show{count === 1 ? "" : "s"}
+              </div>
+            </div>
+          );
+
+          let title = "";
+          let body: React.ReactNode = null;
+
+          if (statSheet === "shows") {
+            title = "your shows";
+            const parsed = parseInt(goalInput, 10);
+            const nextGoal = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+            body = (
+              <>
+                <div style={{ background: "rgba(242,236,224,0.06)", border: "1px solid rgba(242,236,224,0.14)", borderRadius: 14, padding: 14, marginBottom: 14 }}>
+                  <div style={{ fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(242,236,224,0.55)", marginBottom: 8, fontFamily: "var(--font-inter), sans-serif" }}>
+                    your goal
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="number"
+                      min={1}
+                      value={goalInput}
+                      onChange={(e) => setGoalInput(e.target.value)}
+                      placeholder={String(autoGoal)}
+                      className="r-input"
+                      style={{ flex: 1, minWidth: 0, background: "transparent", border: "1px solid rgba(242,236,224,0.22)", borderRadius: 10, color: "#F2ECE0", fontSize: 15, padding: "9px 12px", outline: "none", fontFamily: "var(--font-inter), sans-serif" }}
+                    />
+                    <div
+                      onClick={() => onSetGoal(nextGoal)}
+                      className="r-pressable"
+                      style={{ background: "#FF6B35", color: "#F2ECE0", borderRadius: 10, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-inter), sans-serif", flexShrink: 0 }}
+                    >
+                      save
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(242,236,224,0.45)", marginTop: 8, fontFamily: "var(--font-inter), sans-serif" }}>
+                    {profile.goal ? (
+                      <span onClick={() => onSetGoal(null)} style={{ cursor: "pointer", textDecoration: "underline" }}>
+                        clear goal — use auto ({autoGoal})
+                      </span>
+                    ) : (
+                      `auto goal is ${autoGoal} — set your own target above`
+                    )}
+                  </div>
+                </div>
+                {concerts.length ? concerts.map(concertRow) : <div style={{ ...rowStyle, color: "rgba(242,236,224,0.5)" }}>no shows yet</div>}
+              </>
+            );
+          } else if (statSheet === "artists") {
+            title = "artists";
+            const rows = Array.from(artistCounts.entries()).sort((a, b) => b[1] - a[1]);
+            body = rows.map(([name, n]) => countRow(name, n));
+          } else if (statSheet === "cities") {
+            title = "cities";
+            const cityCounts = new Map<string, number>();
+            concerts.forEach((c) => {
+              const city = cityFromVenue(c.venue) || "—";
+              cityCounts.set(city, (cityCounts.get(city) ?? 0) + 1);
+            });
+            const rows = Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1]);
+            body = rows.map(([name, n]) => countRow(name, n));
+          } else if (statSheet === "photos") {
+            title = "photos";
+            const withPhotos = concerts.filter((c) => c.photos.length > 0);
+            body = withPhotos.length
+              ? withPhotos.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => {
+                      setStatSheet(null);
+                      onOpenConcert(c.id);
+                    }}
+                    className="r-pressable"
+                    style={{ ...rowStyle, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}
+                  >
+                    <div style={{ fontSize: 14, color: "#F2ECE0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.artist}</div>
+                    <div style={{ fontSize: 12.5, color: "rgba(242,236,224,0.55)", flexShrink: 0 }}>
+                      {c.photos.length} photo{c.photos.length === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                ))
+              : <div style={{ ...rowStyle, color: "rgba(242,236,224,0.5)" }}>no photos yet</div>;
+          } else if (statSheet === "favorites") {
+            title = "favorites";
+            const favs = concerts.filter((c) => c.favorite);
+            body = favs.length ? favs.map(concertRow) : <div style={{ ...rowStyle, color: "rgba(242,236,224,0.5)" }}>no favorites yet</div>;
+          } else if (statSheet === "top") {
+            title = topArtist ? topArtist[0] : "top artist";
+            const theirs = topArtist ? concerts.filter((c) => c.artist === topArtist[0]) : [];
+            body = theirs.map(concertRow);
+          }
+
+          return (
+            <div
+              onClick={() => setStatSheet(null)}
+              style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(4,16,16,0.72)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: "100%",
+                  maxWidth: 430,
+                  maxHeight: "82%",
+                  background: "#0b2b2b",
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  border: "1px solid rgba(242,236,224,0.14)",
+                  borderBottom: "none",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 12px", flexShrink: 0 }}>
+                  <div style={{ fontFamily: "var(--font-noto-serif-jp), serif", fontWeight: 700, fontSize: 19, color: "#F2ECE0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {title}
+                  </div>
+                  <div
+                    onClick={() => setStatSheet(null)}
+                    className="r-pressable"
+                    style={{ width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(242,236,224,0.1)", color: "#F2ECE0", cursor: "pointer", flexShrink: 0 }}
+                  >
+                    <IconClose size={16} />
+                  </div>
+                </div>
+                <div className="phone-scroll" style={{ overflowY: "auto", padding: "0 20px 28px" }}>{body}</div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
 
-const EMPTY_DRAFT: Draft = { artist: "", venue: "", date: "", spotify: null, comment: "", ticketUrl: null, ticketCaption: "", photos: [] };
-
-export default function Resonare() {
-  const [screen, setScreen] = useState<Screen>("home");
-  const [concerts, setConcerts] = useState<Concert[]>([]);
-  const [profile, setProfile] = useState<UserProfile>({ email: "", name: "" });
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [previousScreen, setPreviousScreen] = useState<"home" | "profile">("home");
-  const [logStep, setLogStep] = useState(1);
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  const [spotifyQuery, setSpotifyQuery] = useState("");
-  const [spotifyResults, setSpotifyResults] = useState<SpotifyItem[]>([]);
-  const [spotifyLoading, setSpotifyLoading] = useState(false);
-
-  // Full-screen image viewer. kind "view" is read-only; ticket/photo edit the draft.
-  const [lightbox, setLightbox] = useState<
-    | { kind: "ticket" }
-    | { kind: "photo"; index: number }
-    | { kind: "view"; url: string; caption: string }
-    | null
-  >(null);
-
-  const reload = useCallback(async () => {
-    try {
-      const [data, prof] = await Promise.all([loadConcerts(), loadUserProfile()]);
-      setConcerts(data);
-      setProfile(prof);
-      setLoadError(null);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "couldn't load your concerts");
-    }
-  }, []);
-
-  async function renameUser(name: string) {
-    setProfile((p) => ({ ...p, name }));
-    try {
-      await setDisplayName(name);
-    } catch {
-      // revert to server value on failure
-      try {
-        setProfile(await loadUserProfile());
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await reload();
-      setLoading(false);
-    })();
-  }, [reload]);
-
-  // Debounced Spotify search.
-  useEffect(() => {
-    const q = spotifyQuery.trim();
-    if (!q) {
-      setSpotifyResults([]);
-      setSpotifyLoading(false);
-      return;
-    }
-    setSpotifyLoading(true);
-    let cancelled = false;
-    const link = parseSpotifyLink(q);
-    const t = setTimeout(async () => {
-      try {
-        if (link) {
-          const item = await lookupSpotify(link.type, link.id);
-          if (!cancelled) setSpotifyResults(item ? [item] : []);
-        } else {
-          const res = await searchSpotify(q);
-          if (!cancelled) setSpotifyResults(res);
-        }
-      } catch {
-        if (!cancelled) setSpotifyResults([]);
-      } finally {
-        if (!cancelled) setSpotifyLoading(false);
-      }
-    }, 320);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [spotifyQuery]);
-
-  function openDetail(id: string, from: "home" | "profile" = "home") {
-    setSelectedId(id);
-    setPreviousScreen(from);
-    setScreen("detail");
-  }
-
-  function backFromDetail() {
-    setScreen(previousScreen);
-    setSelectedId(null);
-  }
-
-  function goHome() {
-    setScreen("home");
-    setSelectedId(null);
-  }
-
-  function navigate(tab: "home" | "profile") {
-    setScreen(tab);
-    setSelectedId(null);
-  }
-
-  async function importConcerts(items: ImportMeta[]) {
-    try {
-      await importConcertsMeta(items);
-      await reload();
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "import failed");
-    }
-  }
-
-  async function resetConcerts() {
-    try {
-      await deleteAllConcerts();
-      await reload();
-      setSelectedId(null);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "reset failed");
-    }
-  }
-
-  function startLog() {
-    setDraft(EMPTY_DRAFT);
-    setSpotifyQuery("");
-    setSpotifyResults([]);
-    setSaveError(null);
-    setLogStep(1);
-    setScreen("log");
-  }
-
-  function logBack() {
-    if (logStep > 1) setLogStep((s) => s - 1);
-    else goHome();
-  }
-
-  async function logNext() {
-    if (logStep < 4) {
-      setLogStep((s) => s + 1);
-      return;
-    }
-    if (saving) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await createConcert({
-        artist: draft.artist,
-        venue: draft.venue,
-        date: draft.date,
-        comment: draft.comment,
-        ticketDataUrl: draft.ticketUrl,
-        ticketCaption: draft.ticketCaption,
-        photos: draft.photos.filter((p) => p.dataUrl),
-        spotify: draft.spotify,
-      });
-      await reload();
-      goHome();
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "couldn't save — try again");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function toggleFavorite(id: string) {
-    const target = concerts.find((c) => c.id === id);
-    if (!target) return;
-    const next = !target.favorite;
-    setConcerts((prev) => prev.map((c) => (c.id === id ? { ...c, favorite: next } : c)));
-    try {
-      await setFavorite(id, next);
-    } catch {
-      setConcerts((prev) => prev.map((c) => (c.id === id ? { ...c, favorite: !next } : c)));
-    }
-  }
-
-  async function handleSignOut() {
-    await signOut();
-    window.location.href = "/auth";
-  }
-
-  const selectedConcert = concerts.find((c) => c.id === selectedId) ?? null;
-  const showNav = (screen === "home" || screen === "profile") && !loading && !loadError;
-
-  return (
-    <div
-      style={{
-        width: 430,
-        height: "min(860px, calc(100dvh - 72px))",
-        background: "#0F5E5E",
-        borderRadius: 40,
-        overflow: "hidden",
-        position: "relative",
-        border: "1px solid rgba(242,236,224,0.14)",
-        boxShadow: "0 40px 80px -24px rgba(2,16,16,0.65), 0 0 0 1px rgba(242,236,224,0.05)",
-      }}
-    >
-      <div className="phone-scroll" style={{ position: "absolute", inset: 0, overflowY: "auto" }}>
-        {loading ? (
-          <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(242,236,224,0.6)", fontFamily: "var(--font-inter), sans-serif", fontSize: 14 }}>
-            loading your concerts…
-          </div>
-        ) : loadError ? (
-          <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 14, alignItems: "center", justifyContent: "center", padding: 30, textAlign: "center" }}>
-            <div style={{ color: "#F2ECE0", fontFamily: "var(--font-noto-serif-jp), serif", fontSize: 17 }}>couldn&rsquo;t load</div>
-            <div style={{ color: "rgba(242,236,224,0.55)", fontFamily: "var(--font-inter), sans-serif", fontSize: 12.5 }}>{loadError}</div>
-            <div
-              onClick={() => {
-                setLoading(true);
-                reload().finally(() => setLoading(false));
-              }}
-              className="r-pressable"
-              style={{ background: "#FF6B35", color: "#F2ECE0", padding: "10px 22px", borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-inter), sans-serif" }}
-            >
-              retry
-            </div>
-          </div>
-        ) : (
-          <>
-            {screen === "home" && (
-              <HomeScreen
-                concerts={concerts}
-                onOpenConcert={(id) => openDetail(id, "home")}
-                onToggleFavorite={toggleFavorite}
-              />
-            )}
-            {screen === "log" && (
-              <LogScreen
-                draft={draft}
-                step={logStep}
-                spotifyQuery={spotifyQuery}
-                spotifyResults={spotifyResults}
-                spotifyLoading={spotifyLoading}
-                saving={saving}
-                saveError={saveError}
-                onBack={logBack}
-                onNext={logNext}
-                onDraftChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
-                onSpotifyQuery={setSpotifyQuery}
-                onPickSpotify={(item) => setDraft((d) => ({ ...d, spotify: item }))}
-                onClearSpotify={() => setDraft((d) => ({ ...d, spotify: null }))}
-                onTicketFile={(url) => setDraft((d) => ({ ...d, ticketUrl: url }))}
-                onEnlargeTicket={() => draft.ticketUrl && setLightbox({ kind: "ticket" })}
-                onAddPhoto={(url) =>
-                  setDraft((d) => (d.photos.length >= 10 ? d : { ...d, photos: [...d.photos, { dataUrl: url, caption: "" }] }))
-                }
-                onPhotoCaption={(i, caption) =>
-                  setDraft((d) => {
-                    const photos = [...d.photos];
-                    if (photos[i]) photos[i] = { ...photos[i], caption };
-                    return { ...d, photos };
-                  })
-                }
-                onRemovePhoto={(i) => setDraft((d) => ({ ...d, photos: d.photos.filter((_, idx) => idx !== i) }))}
-                onEnlargePhoto={(i) => draft.photos[i] && setLightbox({ kind: "photo", index: i })}
-                onGenerateNote={(tone) =>
-                  generateNote({
-                    artist: draft.artist,
-                    venue: draft.venue,
-                    date: draft.date,
-                    tone,
-                    captions: [
-                      ...(draft.ticketCaption ? [draft.ticketCaption] : []),
-                      ...draft.photos.map((p) => p.caption).filter(Boolean),
-                    ],
-                  })
-                }
-              />
-            )}
-            {screen === "detail" && selectedConcert && (
-              <DetailScreen
-                concert={selectedConcert}
-                onBack={backFromDetail}
-                onToggleFavorite={toggleFavorite}
-                onEnlarge={(url, caption) => setLightbox({ kind: "view", url, caption })}
-              />
-            )}
-            {screen === "profile" && (
-              <ProfileScreen
-                concerts={concerts}
-                profile={profile}
-                onOpenConcert={(id) => openDetail(id, "profile")}
-                onImport={importConcerts}
-                onReset={resetConcerts}
-                onSignOut={handleSignOut}
-                onRename={renameUser}
-              />
-            )}
-          </>
-        )}
-      </div>
-      {showNav && <BottomNav active={screen as "home" | "profile"} onNavigate={navigate} onAdd={startLog} />}
-      <div className="r-grain" />
-
-      {lightbox &&
-        (() => {
-          if (lightbox.kind === "view") {
-            return <Lightbox url={lightbox.url} caption={lightbox.caption} editable={false} onClose={() => setLightbox(null)} />;
-          }
-          if (lightbox.kind === "ticket") {
-            if (!draft.ticketUrl) return null;
-            return (
-              <Lightbox
-                url={draft.ticketUrl}
-                caption={draft.ticketCaption}
-                editable
-                onCaptionChange={(val) => setDraft((d) => ({ ...d, ticketCaption: val }))}
-                onReplace={(url) => setDraft((d) => ({ ...d, ticketUrl: url }))}
-                onRemove={() => {
-                  setDraft((d) => ({ ...d, ticketUrl: null, ticketCaption: "" }));
-                  setLightbox(null);
-                }}
-                onClose={() => setLightbox(null)}
-              />
-            );
-          }
-          // photo
-          const photo = draft.photos[lightbox.index];
-          if (!photo) return null;
-          return (
-            <Lightbox
-              url={photo.dataUrl}
-              caption={photo.caption}
-              editable
-              onCaptionChange={(val) =>
-                setDraft((d) => {
-                  const photos = [...d.photos];
-                  const p = photos[lightbox.index];
-                  if (p) photos[lightbox.index] = { ...p, caption: val };
-                  return { ...d, photos };
-                })
-              }
-              onReplace={(url) =>
-                setDraft((d) => {
-                  const photos = [...d.photos];
-                  const p = photos[lightbox.index];
-                  photos[lightbox.index] = { dataUrl: url, caption: p?.caption ?? "" };
-                  return { ...d, photos };
-                })
-              }
-              onRemove={() => {
-                setDraft((d) => ({ ...d, photos: d.photos.filter((_, idx) => idx !== lightbox.index) }));
-                setLightbox(null);
-              }}
-              onClose={() => setLightbox(null)}
-            />
-          );
-        })()}
-    </div>
-  );
-}
+export const EMPTY_DRAFT: Draft = { artist: "", showName: "", venue: "", date: "", spotify: null, comment: "", ticketUrl: null, ticketCaption: "", photos: [] };

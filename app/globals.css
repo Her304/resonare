@@ -41,6 +41,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background-size: 160px 160px;
 }
 
+/* landing page — collapse hero + feature grid on smaller viewports */
+@media (max-width: 860px) {
+  .landing-hero {
+    flex-direction: column;
+    gap: 40px !important;
+    text-align: center;
+  }
+  .landing-hero p {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .landing-hero > div:first-child > div:last-child {
+    justify-content: center;
+  }
+  .landing-features {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+@media (max-width: 560px) {
+  .landing-features {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* physical press feedback for tappable elements */
 .r-pressable {
   transition: transform 0.15s ease, opacity 0.15s ease;

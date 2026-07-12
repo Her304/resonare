@@ -30,19 +30,21 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthRoute = path.startsWith("/auth");
+  // / is the public marketing landing page; /login is the sign-in page;
+  // /auth/* are the magic-link callback + signout handlers.
+  const isPublicRoute = path === "/" || path === "/login" || path.startsWith("/auth");
 
-  // Unauthenticated users are sent to /auth (except the auth routes themselves).
-  if (!user && !isAuthRoute) {
+  // Unauthenticated users are sent to /login (except the public auth routes).
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/auth";
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
   // Signed-in users have no reason to sit on the sign-in page.
-  if (user && path === "/auth") {
+  if (user && path === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/home";
     return NextResponse.redirect(url);
   }
 
