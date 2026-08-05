@@ -105,11 +105,11 @@ Server-side route `/api/generate-note` calls OpenAI (`gpt-4o-mini`) with the sho
 
 ### Key Pages
 
-Real App Router routes. Unauthenticated users are redirected to `/login` by middleware; `/` redirects to `/home`. The authenticated app lives under the `app/(app)/` route group (shared phone-frame layout + `AppStore`).
+Real App Router routes. `/` is the public marketing landing page; unauthenticated users hitting any other non-public route are redirected to `/login` by middleware (public routes: `/`, `/login`, `/auth/*`). The authenticated app lives under the `app/(app)/` route group (shared phone-frame layout + `AppStore`).
 
 | Route | Purpose |
 |---|---|
-| `/` | Redirects to `/home` |
+| `/` | Public landing page (`app/page.tsx`) — hero, feature grid, CTAs to `/login`. Client component with motion: kinetic-type hero entrance, IntersectionObserver scroll reveals, a stat count-up + ring draw on an on-brand phone mockup, and a "Magic Move" shared concert card that relays from the hero into the features section. All motion is gated behind `prefers-reduced-motion`. |
 | `/home` | Concert list (grid of cards) |
 | `/log` | Multi-step form: the show → the memories → the soundtrack → the feeling |
 | `/profile` | Stats, clickable stat tiles (bottom-sheet breakdowns), city map, personal goal, data export/import |
