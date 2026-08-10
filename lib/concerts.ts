@@ -281,8 +281,16 @@ export async function loadUserProfile(): Promise<UserProfile> {
 
 export async function setDisplayName(name: string): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.auth.updateUser({ data: { display_name: name.trim() } });
+  const trimmed = name.trim();
+  const { error } = await supabase.auth.updateUser({ data: { display_name: trimmed } });
   if (error) throw error;
+
+  // Keep the public profile row in step — it, not auth metadata, is what other
+  // users will read once sharing lands.
+  const { data } = await supabase.auth.getUser();
+  if (data.user) {
+    await supabase.from("profiles").update({ display_name: trimmed }).eq("id", data.user.id);
+  }
 }
 
 // Personal shows goal, stored in auth metadata. Pass null to clear it (revert to auto).

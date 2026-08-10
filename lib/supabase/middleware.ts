@@ -30,9 +30,19 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  // / is the public marketing landing page; /login is the sign-in page;
-  // /auth/* are the magic-link callback + signout handlers.
-  const isPublicRoute = path === "/" || path === "/login" || path.startsWith("/auth");
+  // / is the public marketing landing page; /login is sign-in + sign-up;
+  // /forgot-password and /reset-password are the password recovery screens
+  // (/reset-password stays public so an expired link can explain itself rather
+  // than bouncing to /login); /auth/* are the callback + signout handlers.
+  const isPublicRoute =
+    path === "/" ||
+    path === "/login" ||
+    path === "/forgot-password" ||
+    path === "/reset-password" ||
+    path === "/terms" ||
+    path === "/privacy" ||
+    path === "/community-guidelines" ||
+    path.startsWith("/auth");
 
   // Unauthenticated users are sent to /login (except the public auth routes).
   if (!user && !isPublicRoute) {

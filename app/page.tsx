@@ -158,19 +158,38 @@ export default function LandingPage() {
           <div style={{ fontFamily: serif, fontWeight: 700, fontSize: 22, letterSpacing: "-0.5px" }}>
             resonare
           </div>
-          <Link
-            href="/login"
-            className="r-pressable"
-            style={{
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: "rgba(242,236,224,0.85)",
-              textDecoration: "none",
-              padding: "8px 4px",
-            }}
-          >
-            sign in
-          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Link
+              href="/login"
+              className="r-pressable"
+              style={{
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: "rgba(242,236,224,0.85)",
+                textDecoration: "none",
+                padding: "9px 14px",
+                borderRadius: 999,
+              }}
+            >
+              sign in
+            </Link>
+            <Link
+              href="/login?mode=signup"
+              className="r-pressable"
+              style={{
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: "#F2ECE0",
+                background: "#FF6B35",
+                textDecoration: "none",
+                padding: "9px 18px",
+                borderRadius: 999,
+                boxShadow: "0 10px 24px -12px rgba(255,107,53,0.9)",
+              }}
+            >
+              sign up
+            </Link>
+          </div>
         </header>
 
         {/* Hero */}
@@ -244,7 +263,7 @@ export default function LandingPage() {
               }}
             >
               <Link
-                href="/login"
+                href="/login?mode=signup"
                 className="r-pressable"
                 style={{
                   background: "#FF6B35",
@@ -279,7 +298,7 @@ export default function LandingPage() {
               className="kin"
               style={{ animationDelay: "760ms", marginTop: 18, fontSize: 12.5, color: "rgba(242,236,224,0.45)" }}
             >
-              No password — just a magic link to your inbox.
+              Free to start. Your diary stays private to you.
             </div>
           </div>
 
@@ -424,7 +443,7 @@ export default function LandingPage() {
                 keep forever.
               </p>
               <Link
-                href="/login"
+                href="/login?mode=signup"
                 className="r-pressable"
                 style={{
                   display: "inline-block",
@@ -461,9 +480,24 @@ export default function LandingPage() {
             <span style={{ fontFamily: serif, fontWeight: 700, fontSize: 16 }}>resonare</span>
             <span style={{ fontSize: 12.5, color: "rgba(242,236,224,0.45)" }}>your concert diary</span>
           </div>
-          <Link href="/login" style={{ fontSize: 13, color: "rgba(242,236,224,0.6)", textDecoration: "none" }}>
-            sign in →
-          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+            {[
+              { href: "/terms", label: "terms" },
+              { href: "/privacy", label: "privacy" },
+              { href: "/community-guidelines", label: "guidelines" },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                style={{ fontSize: 12.5, color: "rgba(242,236,224,0.45)", textDecoration: "none" }}
+              >
+                {l.label}
+              </Link>
+            ))}
+            <Link href="/login" style={{ fontSize: 13, color: "rgba(242,236,224,0.6)", textDecoration: "none" }}>
+              sign in →
+            </Link>
+          </div>
         </footer>
       </div>
     </main>

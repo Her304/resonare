@@ -82,13 +82,27 @@ concert_photos   -- up to 10 photos per concert
 concert_spotify  -- one linked album or playlist per concert
   id, concert_id, spotify_type ('album'|'playlist'), spotify_id,
   name, artist, cover_url, external_url
+
+profiles         -- one row per auth user, created by an on_auth_user_created trigger
+  id (= auth.users.id), username (citext unique), display_name, bio, avatar_url,
+  is_private, terms_accepted_at, terms_version, created_at, updated_at
+  -- username uniqueness is why this table exists; auth metadata cannot enforce it
+
+reserved_usernames -- route names + impersonation risks, checked by username_available()
 ```
 
-All tables use **Row Level Security** — users only access their own rows.
+All concert tables use **Row Level Security** — users only access their own rows.
+
+`profiles` is the deliberate exception: it is **readable by any authenticated user**, because
+usernames are the basis of the planned social features. Insert/update remain owner-only.
+`public.username_available(text)` is a `security definer` function granted to `anon`, so the sign-up
+form can check a handle before the user has a session without exposing the table itself. Uniqueness
+is ultimately enforced by the constraint, not the check — `/login` maps the resulting insert error
+back to "that username was just taken".
 
 Migrations live in `supabase/migrations/` and are applied by hand in the Supabase SQL editor
-(`0001_init` → `0002_captions` → `0003_show_name`). They are idempotent (`if not exists` /
-`add column if not exists`).
+(`0001_init` → `0002_captions` → `0003_show_name` → `0004_profiles`). They are idempotent
+(`if not exists` / `add column if not exists`).
 
 ### Supabase Storage Buckets
 
@@ -103,9 +117,31 @@ Server-side routes `/api/spotify/search` and `/api/spotify/lookup` proxy request
 
 Server-side route `/api/generate-note` calls OpenAI (`gpt-4o-mini`) with the show details + photo/ticket captions and a chosen tone to draft a short first-person diary reflection. The API key stays server-side; returns `500 "OpenAI key not configured"` when `OPENAI_API_KEY` is unset.
 
+### Auth
+
+Email + password via Supabase Auth — it handles bcrypt hashing (`auth.users.encrypted_password`)
+and JWT issuance; `@supabase/ssr` keeps the session in cookies and `lib/supabase/middleware.ts`
+refreshes it on every request. Nothing is hand-rolled and no password ever reaches our code.
+
+Email is only sent for password recovery. This depends on **Confirm email being off** in the
+Supabase dashboard (Authentication → Providers → Email) — with it on, `signUp` returns no session,
+and `/login` falls back to a "confirm your email" state. Recovery links point at
+`/auth/callback?next=/reset-password`, which exchanges the code for a session before the user picks
+a new password. Supabase's built-in SMTP is rate-limited to a handful of emails per hour (HTTP 429);
+custom SMTP is needed for real volume.
+
+Sign-up captures email, a unique username, password + confirmation, and a required consent checkbox
+covering the terms, community guidelines and data collection. The accepted `POLICY_VERSION` and a
+timestamp are passed through `options.data` and recorded on the profile row, so a future policy
+change can identify who has not re-accepted.
+
+Shared auth-screen styles live in `components/authStyles.ts`; legal copy constants (entity name,
+contact addresses, policy version) live in `lib/legal.ts` — these contain **placeholders that must
+be filled in before launch**.
+
 ### Key Pages
 
-Real App Router routes. `/` is the public marketing landing page; unauthenticated users hitting any other non-public route are redirected to `/login` by middleware (public routes: `/`, `/login`, `/auth/*`). The authenticated app lives under the `app/(app)/` route group (shared phone-frame layout + `AppStore`).
+Real App Router routes. `/` is the public marketing landing page; unauthenticated users hitting any other non-public route are redirected to `/login` by middleware (public routes: `/`, `/login`, `/forgot-password`, `/reset-password`, `/auth/*`). The authenticated app lives under the `app/(app)/` route group (shared phone-frame layout + `AppStore`).
 
 | Route | Purpose |
 |---|---|
@@ -114,8 +150,11 @@ Real App Router routes. `/` is the public marketing landing page; unauthenticate
 | `/log` | Multi-step form: the show → the memories → the soundtrack → the feeling |
 | `/profile` | Stats, clickable stat tiles (bottom-sheet breakdowns), city map, personal goal, data export/import |
 | `/concerts/[id]` | Detail view: ticket, gallery, Spotify card, notes (shareable URL) |
-| `/login` | Magic-link sign in |
-| `/auth/callback`, `/auth/signout` | Supabase magic-link exchange + sign-out route handlers |
+| `/login` | Email + password sign in / sign up (tabbed); sign-up also seeds `display_name` |
+| `/forgot-password` | Requests a password-reset email (`resetPasswordForEmail`) |
+| `/reset-password` | Sets a new password from a recovery link (`updateUser`); shows an expired-link state when no session |
+| `/auth/callback`, `/auth/signout` | Emailed-code exchange (recovery / confirmation) + sign-out route handlers |
+| `/terms`, `/privacy`, `/community-guidelines` | Policy documents (`app/(legal)/` route group — plain document styling via `legal.css`, deliberately unlike the app chrome) |
 
 ## Environment Variables
 
