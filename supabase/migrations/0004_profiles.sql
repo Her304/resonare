@@ -38,13 +38,10 @@ create table if not exists public.reserved_usernames (
   username citext primary key
 );
 
-insert into public.reserved_usernames (username) values
-  ('admin'), ('administrator'), ('resonare'), ('support'), ('help'), ('api'),
-  ('auth'), ('login'), ('logout'), ('signup'), ('signin'), ('settings'),
-  ('profile'), ('profiles'), ('home'), ('log'), ('concerts'), ('terms'),
-  ('privacy'), ('security'), ('about'), ('contact'), ('legal'), ('root'),
-  ('system'), ('staff'), ('team'), ('official'), ('moderator'), ('mod'),
-  ('null'), ('undefined'), ('me'), ('you'), ('new'), ('edit'), ('delete')
+-- One quoted literal rather than 37, so a mangled apostrophe on paste cannot
+-- silently shift the string boundaries.
+insert into public.reserved_usernames (username)
+select unnest(string_to_array('admin,administrator,resonare,support,help,api,auth,login,logout,signup,signin,settings,profile,profiles,home,log,concerts,terms,privacy,security,about,contact,legal,root,system,staff,team,official,moderator,mod,null,undefined,me,you,new,edit,delete', ','))
 on conflict (username) do nothing;
 
 -- ─────────────────────────────────────────────────────────────────────────────
